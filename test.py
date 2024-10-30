@@ -49,7 +49,7 @@ def consulta_avanzada(es, indice):
         "query": {
             "bool": {
                 "must": [
-                    {"match": {"titulo": "science"}},
+                    {"match": {"resumen": "science"}},
                     #sin filtro de fecha
                 ]
             }

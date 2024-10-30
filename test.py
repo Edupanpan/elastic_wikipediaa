@@ -50,7 +50,7 @@ def consulta_avanzada(es, indice):
             "bool": {
                 "must": [
                     {"match": {"resumen": "science"}},
-                    #sin filtro de fecha
+                    # {"range": {"timestamp": {"gte": "2021-01-01"}}}
                 ]
             }
         }
@@ -66,16 +66,33 @@ def consulta_avanzada(es, indice):
         print("No se encontraron resultados.")
 
 
+def consulta_ponderada(es, indice, termino):
+    query = {
+        "size": 5,
+        "query": {
+            "bool": {
+                "should": [
+                    {"match": {"titulo": {"query": termino, "boost": 2}}},
+                    {"match": {"resumen": {"query": termino, "boost": 1}}}
+                ]
+            }
+        }
+    }
 
+    resultados = es.search(index=indice, body=query)
+    print("\nResultados de la búsqueda ponderada:")
+    if resultados['hits']['hits']:
+        for i, hit in enumerate(resultados['hits']['hits'], 1):
+            print(f"\nRegistro {i}:")
+            print(json.dumps(hit['_source'], indent=4))
+    else:
+        print("No se encontraron resultados.")
 
-# ======= Ejecución Principal =======
+# Ejecución Principal 
 if __name__ == "__main__":
-    # Verificar los datos disponibles en el índice
+
     verificar_datos(es, indice)
-
-
-    # Ejecutar la consulta avanzada
-    print("\nEjecutando consulta avanzada...")
     consulta_avanzada(es, indice)
+    consulta_ponderada(es, indice, "science")
 
 

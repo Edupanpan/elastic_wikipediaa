@@ -1,5 +1,4 @@
 import json
-import requests
 from elasticsearch import Elasticsearch
 import matplotlib.pyplot as plt
 
@@ -36,7 +35,7 @@ else:
     print(f"Índice '{indice}' ya existe.")
 
 # Consultas
-def verificar_datos(es, indice):
+def ver_datos(es, indice):
     query = {"size": 5, "query": {"match_all": {}}}
     resultados = es.search(index=indice, body=query)
     for i, hit in enumerate(resultados['hits']['hits'], 1):
@@ -120,7 +119,7 @@ def grafico(es, indice):
 # Ejecución Principal 
 if __name__ == "__main__":
 
-    verificar_datos(es, indice)
+    ver_datos(es, indice)
     consulta_avanzada(es, indice)
     consulta_ponderada(es, indice, "science")
     grafico(es, indice)

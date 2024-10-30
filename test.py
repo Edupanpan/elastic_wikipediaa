@@ -1,85 +1,81 @@
-import wikipediaapi
-from elasticsearch import Elasticsearch
+import json
 import requests
-from datetime import datetime
+from elasticsearch import Elasticsearch
+import matplotlib.pyplot as plt
 
-# Conexión a Elasticsearch
-client = Elasticsearch(
+# Conexión a Elasticsearch 
+es = Elasticsearch(
     hosts=["https://localhost:9200"],
     basic_auth=("edu", "123456"),
     verify_certs=False,
     ssl_show_warn=False
 )
 
-# Verificación del estado del clúster
-if client.ping():
-    print("Conexión exitosa a Elasticsearch")
+if es.ping():
+    print("Conectado a Elasticsearch")
 else:
-    print("Error al conectar a Elasticsearch")
+    raise Exception("Error de conexión con Elasticsearch")
 
-# Nombre del índice
-indexName = "wikipedia_edits"
-
-# Definir el mapeo del índice
-editsMapping = {
-    "settings": {
-        "number_of_shards": 1,
-        "number_of_replicas": 1
-    },
+# Crear el Índice en Elasticsearch
+indice = "wikipedia_edits"
+indice_config = {
     "mappings": {
         "properties": {
-            'titulo': {'type': 'text'},
-            'resumen': {'type': 'text'},
-            'nombreEditor': {'type': 'keyword'},
-            'fechaEdicion': {'type': 'date'}
+            "titulo": {"type": "text"},
+            "usuario": {"type": "keyword"},
+            "resumen": {"type": "text"},
+            "timestamp": {"type": "date"}
         }
     }
 }
 
-# Crear el índice si no existe
-if not client.indices.exists(index=indexName):
-    client.indices.create(index=indexName, body=editsMapping)
-    print(f"Índice '{indexName}' creado exitosamente.")
+if not es.indices.exists(index=indice):
+    es.indices.create(index=indice, body=indice_config)
+    print(f"Índice '{indice}' creado.")
 else:
-    print(f"Índice '{indexName}' ya existe.")
+    print(f"Índice '{indice}' ya existe.")
 
-def cargar_historial_ediciones(titulo_pagina, limite=7):
-    wiki_wiki = wikipediaapi.Wikipedia(
-        language='en',
-        user_agent='MyWikipediaApp/1.0 (https://example.com/myapp)'
-    )
-    page = wiki_wiki.page(titulo_pagina)
+# Consultas
+def verificar_datos(es, indice):
+    query = {"size": 5, "query": {"match_all": {}}}
+    resultados = es.search(index=indice, body=query)
+    for i, hit in enumerate(resultados['hits']['hits'], 1):
+        print(f"\nRegistro {i}:")
+        print(json.dumps(hit['_source'], indent=4))
 
-    if not page.exists():
-        print(f"La página '{titulo_pagina}' no existe.")
-        return
-
-    # Usar la API de Wikipedia para obtener las revisiones
-    url = f"https://en.wikipedia.org/w/api.php"
-    params = {
-        "action": "query",
-        "titles": titulo_pagina,
-        "prop": "revisions",
-        "rvlimit": limite,
-        "rvprop": "ids|timestamp|user|comment",
-        "format": "json"
-    }
-    response = requests.get(url, params=params)
-    data = response.json()
-    page_id = next(iter(data['query']['pages']))
-    revisions = data['query']['pages'][page_id]['revisions']
-
-    cont = 1
-    for revision in revisions:
-        doc = {
-            'titulo': titulo_pagina,
-            'resumen': revision.get('comment', ''),
-            'nombreEditor': revision['user'],
-            'fechaEdicion': revision['timestamp']
+def consulta_avanzada(es, indice):
+    query = {
+        "size": 5,
+        "query": {
+            "bool": {
+                "must": [
+                    {"match": {"titulo": "science"}},
+                    #sin filtro de fecha
+                ]
+            }
         }
-        client.index(index=indexName, document=doc)
-        print(f"{cont}. {doc}\n")
-        cont += 1
+    }
 
-# Llamar a la función para cargar el historial de ediciones
-cargar_historial_ediciones("Python (programming language)", limite=5)
+    resultados = es.search(index=indice, body=query)
+    print("\nResultados de la consulta avanzada:")
+    if resultados['hits']['hits']:
+        for i, hit in enumerate(resultados['hits']['hits'], 1):
+            print(f"\nRegistro {i}:")
+            print(json.dumps(hit['_source'], indent=4))
+    else:
+        print("No se encontraron resultados.")
+
+
+
+
+# ======= Ejecución Principal =======
+if __name__ == "__main__":
+    # Verificar los datos disponibles en el índice
+    verificar_datos(es, indice)
+
+
+    # Ejecutar la consulta avanzada
+    print("\nEjecutando consulta avanzada...")
+    consulta_avanzada(es, indice)
+
+

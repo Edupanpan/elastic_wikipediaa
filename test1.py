@@ -22,10 +22,6 @@ indexName = "wikipedia_edits"
 
 # Definir el mapeo del índice
 editsMapping = {
-    "settings": {
-        "number_of_shards": 1,
-        "number_of_replicas": 1
-    },
     "mappings": {
         "properties": {
             'titulo': {'type': 'text'},
@@ -43,7 +39,10 @@ if not client.indices.exists(index=indexName):
 else:
     print(f"Índice '{indexName}' ya existe.")
 
-def cargar_historial_ediciones(titulo_pagina, limite=7):
+titulo_pagina = "Science"
+fechaInicio = "2021-01-01"
+
+def cargar_historial_ediciones(titulo_pagina, fechaInicio, limite=7):
     wiki_wiki = wikipediaapi.Wikipedia(
         language='en',
         user_agent='MyWikipediaApp/1.0 (https://example.com/myapp)'
@@ -61,25 +60,29 @@ def cargar_historial_ediciones(titulo_pagina, limite=7):
         "titles": titulo_pagina,
         "prop": "revisions",
         "rvlimit": limite,
-        "rvprop": "ids|timestamp|user|comment",
+        "rvprop": "timestamp|user|comment",
         "format": "json"
     }
+    
     response = requests.get(url, params=params)
     data = response.json()
     page_id = next(iter(data['query']['pages']))
-    revisions = data['query']['pages'][page_id]['revisions']
+    revisions = data['query']['pages'][page_id].get('revisions', [])
 
     cont = 1
     for revision in revisions:
-        doc = {
-            'titulo': titulo_pagina,
-            'resumen': revision.get('comment', ''),
-            'nombreEditor': revision['user'],
-            'fechaEdicion': revision['timestamp']
-        }
-        client.index(index=indexName, document=doc)
-        print(f"{cont}. {doc}\n")
-        cont += 1
+        # Convertir la fecha de la edición a un objeto datetime para comparaciones
+        fecha_edicion = revision['timestamp']
+        if fecha_edicion >= fechaInicio:  # Filtrar por fecha
+            doc = {
+                'titulo': titulo_pagina,
+                'resumen': revision.get('comment', ''),
+                'nombreEditor': revision['user'],
+                'fechaEdicion': fecha_edicion
+            }
+            client.index(index=indexName, document=doc)
+            print(f"{cont}. {doc}\n")
+            cont += 1
 
 # Llamar a la función para cargar el historial de ediciones
-cargar_historial_ediciones("Python (programming language)", limite=5)
+cargar_historial_ediciones(titulo_pagina, fechaInicio, limite=5)

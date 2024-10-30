@@ -72,7 +72,7 @@ def consulta_ponderada(es, indice, termino):
         "query": {
             "bool": {
                 "should": [
-                    {"match": {"titulo": {"query": termino, "boost": 2}}},
+                    {"match": {"titulo": {"query": termino, "boost": 3}}},
                     {"match": {"resumen": {"query": termino, "boost": 1}}}
                 ]
             }
@@ -87,12 +87,41 @@ def consulta_ponderada(es, indice, termino):
             print(json.dumps(hit['_source'], indent=4))
     else:
         print("No se encontraron resultados.")
+def grafico(es, indice):
+    query = {
+        "size": 1000,
+        "query": {
+            "match_all": {}
+        }
+    }
 
+    resultados = es.search(index=indice, body=query)
+    categorias = {}
+
+    for hit in resultados['hits']['hits']:
+        categoria = hit['_source'].get('resumen', 'Desconocido')
+        if categoria in categorias:
+            categorias[categoria] += 1
+        else:
+            categorias[categoria] = 1
+
+    categorias_ordenadas = dict(sorted(categorias.items(), key=lambda item: item[1], reverse=True))
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(categorias_ordenadas.keys(), categorias_ordenadas.values(), color='skyblue')
+    plt.xlabel('Categoría de Artículo')
+    plt.ylabel('Número de Ediciones')
+    plt.title('Número de Ediciones por Categoría de Artículo')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.show()
+
+        
 # Ejecución Principal 
 if __name__ == "__main__":
 
     verificar_datos(es, indice)
     consulta_avanzada(es, indice)
     consulta_ponderada(es, indice, "science")
-
+    grafico(es, indice)
 
